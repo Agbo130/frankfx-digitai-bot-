@@ -1,10 +1,12 @@
+
 from flask import Flask, render_template, request, jsonify
+import threading
 import websocket
 import json
 
 app = Flask(__name__)
 
-# === SESSION STATE ===
+# === SESSION DATA ===
 session_data = {
     'token': None,
     'ws': None,
@@ -15,12 +17,12 @@ session_data = {
     'account_info': {},
     'auto_trade': False,
     'current_prediction': None,
-    'strategy': 'even',  # Default
+    'strategy': 'even',
     'win_count': 0,
     'loss_count': 0
 }
 
-# === START WEBSOCKET TO DERIV ===
+# === DERIV WEBSOCKET ===
 def start_ws():
     def on_message(ws, message):
         data = json.loads(message)
@@ -51,7 +53,6 @@ def start_ws():
                     session_data['win_count'] += 1
                 else:
                     session_data['loss_count'] += 1
-
                 session_data['current_prediction'] = None
 
         elif data.get('msg_type') == 'buy':
@@ -59,13 +60,14 @@ def start_ws():
             session_data['trade_result'] = f"Trade executed: Contract ID {contract_id}"
 
     def on_open(ws):
-        ws.send(json.dumps({"authorize": session_data['token']}))
+        if session_data['token']:
+            ws.send(json.dumps({"authorize": session_data['token']}))
 
     def on_error(ws, error):
-        print("WebSocket Error:", error)
+        print("WebSocket error:", error)
 
     def on_close(ws, code, msg):
-        print("WebSocket Closed")
+        print("WebSocket closed")
 
     ws = websocket.WebSocketApp(
         "wss://ws.deriv.com/websockets/v3",
@@ -84,17 +86,12 @@ def index():
 
 @app.route('/set-token', methods=['POST'])
 def set_token():
-    token = request.json.get('token')
-    session_data['token'] = token
+    session_data['token'] = request.json.get('token')
     session_data['authorized'] = False
     session_data['digits'] = []
     session_data['win_count'] = 0
     session_data['loss_count'] = 0
-
-    # ✅ FIX FOR RAILWAY (run directly, not in thread)
-    start_ws()
-
-    return jsonify({"status": "WebSocket started"})
+    return jsonify({"status": "Token set"})
 
 @app.route('/latest')
 def latest():
@@ -141,5 +138,7 @@ def auto_toggle():
     session_data['auto_trade'] = state
     return jsonify({"status": f"Auto mode {'enabled' if state else 'disabled'}"})
 
+# === START SERVER + WS TOGETHER ===
 if __name__ == '__main__':
+    threading.Thread(target=start_ws).start()
     app.run(host='0.0.0.0', port=8080)
