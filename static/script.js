@@ -1,4 +1,5 @@
 let digits = [];
+let autoMode = false;
 
 function setToken() {
   const token = document.getElementById("token").value;
@@ -7,13 +8,15 @@ function setToken() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ token })
   }).then(() => {
-    alert("Connected to Deriv!");
+    alert("Connected to Deriv. Starting stream...");
     startPolling();
   });
 }
 
-function trade(direction) {
+function tradeManual() {
+  const direction = document.getElementById("strategy").value;
   const amount = document.getElementById("stake").value;
+
   fetch("/trade", {
     method: "POST",
     headers: { 'Content-Type': 'application/json' },
@@ -23,47 +26,74 @@ function trade(direction) {
   });
 }
 
+function toggleAuto() {
+  autoMode = document.getElementById("auto-mode").checked;
+  fetch("/auto-toggle", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ state: autoMode })
+  }).then(res => res.json()).then(data => {
+    console.log(data.status);
+  });
+}
+
 function startPolling() {
   setInterval(() => {
     fetch("/latest")
       .then(res => res.json())
       .then(data => {
         const digit = data.digit;
-        const historyDiv = document.getElementById("digit-history");
+        const digitsArray = data.digits || [];
+        digits = digitsArray;
+        const balance = data.account?.balance || 0;
+        const currency = data.account?.currency || "";
+        const loginid = data.account?.account_type || "-";
+        const win = data.win || 0;
+        const loss = data.loss || 0;
 
-        if (digit !== null) {
-          digits.push(digit);
-          if (digits.length > 20) digits.shift();
+        // Update UI
+        document.getElementById("latest-digit").innerText = digit ?? "-";
+        document.getElementById("digit-history").innerText = digitsArray.join(" ");
+        document.getElementById("account-balance").innerText = `${balance} ${currency}`;
+        document.getElementById("account-type").innerText = loginid;
+        document.getElementById("win-loss").innerText = `Wins: ${win} | Losses: ${loss}`;
 
-          document.getElementById("latest-digit").innerText = digit;
-          historyDiv.innerText = digits.join(" ");
+        // AI Prediction logic
+        let evenCount = digitsArray.filter(d => d % 2 === 0).length;
+        let oddCount = digitsArray.length - evenCount;
 
-          const evenCount = digits.filter(d => d % 2 === 0).length;
-          const oddCount = digits.length - evenCount;
+        let prediction = "-";
+        let confidence = "-";
+        let safety = "WAIT";
 
-          let prediction = "-";
-          let confidence = "-";
-          let safety = "WAIT";
-
-          if (digits.length >= 10) {
-            if (oddCount >= 7) {
-              prediction = "EVEN";
-              confidence = Math.round((oddCount / digits.length) * 100) + "%";
-              safety = "EXCELLENT";
-            } else if (evenCount >= 7) {
-              prediction = "ODD";
-              confidence = Math.round((evenCount / digits.length) * 100) + "%";
-              safety = "EXCELLENT";
-            } else {
-              prediction = (digit % 2 === 0) ? "ODD" : "EVEN";
-              confidence = "50%";
-              safety = "MEDIUM";
-            }
+        if (digitsArray.length >= 10) {
+          if (oddCount >= 7) {
+            prediction = "EVEN";
+            confidence = Math.round((oddCount / digitsArray.length) * 100) + "%";
+            safety = "EXCELLENT";
+          } else if (evenCount >= 7) {
+            prediction = "ODD";
+            confidence = Math.round((evenCount / digitsArray.length) * 100) + "%";
+            safety = "EXCELLENT";
+          } else {
+            prediction = (digit % 2 === 0) ? "ODD" : "EVEN";
+            confidence = "50%";
+            safety = "LOW";
           }
 
           document.getElementById("prediction").innerText = prediction;
           document.getElementById("confidence").innerText = confidence;
           document.getElementById("safety").innerText = safety;
+
+          if (autoMode && safety === "EXCELLENT") {
+            const strategy = prediction.toLowerCase(); // 'even' or 'odd'
+            const amount = document.getElementById("stake").value;
+            fetch("/trade", {
+              method: "POST",
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ direction: strategy, amount })
+            });
+          }
         }
 
         if (data.result) {
