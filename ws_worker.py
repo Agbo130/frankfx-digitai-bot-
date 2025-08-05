@@ -2,29 +2,27 @@ import websocket
 import json
 import time
 
-# === SESSION DATA (simulated memory, replace with shared DB or Redis for production)
-session_data = {
-    'token': None,
-    'authorized': False,
-    'latest_tick': None,
-    'digits': [],
-    'account_info': {},
-    'auto_trade': False,
-    'current_prediction': None,
-    'win_count': 0,
-    'loss_count': 0
-}
+SESSION_FILE = 'session.json'
+
+def read_session():
+    with open(SESSION_FILE, 'r') as f:
+        return json.load(f)
+
+def write_session(data):
+    with open(SESSION_FILE, 'w') as f:
+        json.dump(data, f)
 
 def on_message(ws, message):
+    session = read_session()
     data = json.loads(message)
 
     if data.get('msg_type') == 'authorize':
-        session_data['authorized'] = True
+        session['authorized'] = True
         ws.send(json.dumps({"balance": 1, "subscribe": 1}))
         ws.send(json.dumps({"ticks": "R_10", "subscribe": 1}))
 
     elif data.get('msg_type') == 'balance':
-        session_data['account_info'] = {
+        session['account_info'] = {
             'balance': data['balance']['balance'],
             'currency': data['balance']['currency'],
             'account_type': data['balance']['loginid']
@@ -32,33 +30,35 @@ def on_message(ws, message):
 
     elif data.get('msg_type') == 'tick':
         digit = int(data['tick']['quote'][-1])
-        session_data['latest_tick'] = digit
-        session_data['digits'].append(digit)
-        if len(session_data['digits']) > 20:
-            session_data['digits'].pop(0)
+        session['latest_tick'] = digit
+        session['digits'].append(digit)
+        if len(session['digits']) > 20:
+            session['digits'].pop(0)
 
-        if session_data['auto_trade'] and session_data['current_prediction']:
-            prediction = session_data['current_prediction']
+        prediction = session.get('current_prediction')
+        if session.get('auto_trade') and prediction:
             if (prediction == 'EVEN' and digit % 2 == 0) or (prediction == 'ODD' and digit % 2 != 0):
-                session_data['win_count'] += 1
+                session['win_count'] += 1
+                session['trade_result'] = "✅ WIN"
             else:
-                session_data['loss_count'] += 1
-            session_data['current_prediction'] = None
+                session['loss_count'] += 1
+                session['trade_result'] = "❌ LOSS"
+            session['current_prediction'] = None
 
-    elif data.get('msg_type') == 'buy':
-        print(f"Trade placed! Contract ID: {data['buy']['contract_id']}")
+    write_session(session)
 
 def on_open(ws):
-    if session_data['token']:
-        ws.send(json.dumps({"authorize": session_data['token']}))
+    session = read_session()
+    if session.get('token'):
+        ws.send(json.dumps({"authorize": session['token']}))
     else:
-        print("Waiting for token...")
+        print("No token found")
 
 def on_error(ws, error):
-    print("WebSocket Error:", error)
+    print("WebSocket error:", error)
 
 def on_close(ws, code, msg):
-    print("WebSocket Closed")
+    print("WebSocket closed")
 
 def run_ws():
     while True:
@@ -76,7 +76,4 @@ def run_ws():
         time.sleep(5)
 
 if __name__ == '__main__':
-    # Paste your token directly here for now
-    session_data['token'] = "PASTE_YOUR_DERIV_TOKEN_HERE"
-    session_data['auto_trade'] = True
     run_ws()

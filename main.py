@@ -1,19 +1,16 @@
 from flask import Flask, render_template, request, jsonify
+import json
 
 app = Flask(__name__)
+SESSION_FILE = 'session.json'
 
-# === Shared Session (via JSON or Redis in full setup)
-session_data = {
-    'latest_tick': None,
-    'digits': [],
-    'trade_result': None,
-    'account_info': {},
-    'auto_trade': False,
-    'current_prediction': None,
-    'win_count': 0,
-    'loss_count': 0,
-    'token': None
-}
+def read_session():
+    with open(SESSION_FILE, 'r') as f:
+        return json.load(f)
+
+def write_session(data):
+    with open(SESSION_FILE, 'w') as f:
+        json.dump(data, f)
 
 @app.route('/')
 def index():
@@ -21,32 +18,39 @@ def index():
 
 @app.route('/set-token', methods=['POST'])
 def set_token():
-    session_data['token'] = request.json.get('token')
-    return jsonify({"status": "Token received"})
+    session = read_session()
+    session['token'] = request.json.get('token')
+    write_session(session)
+    return jsonify({"status": "Token saved"})
 
 @app.route('/latest')
 def latest():
+    session = read_session()
     return jsonify({
-        "digit": session_data['latest_tick'],
-        "digits": session_data['digits'],
-        "result": session_data['trade_result'],
-        "account": session_data['account_info'],
-        "win": session_data['win_count'],
-        "loss": session_data['loss_count']
+        "digit": session['latest_tick'],
+        "digits": session['digits'],
+        "result": session['trade_result'],
+        "account": session['account_info'],
+        "win": session['win_count'],
+        "loss": session['loss_count']
     })
 
 @app.route('/trade', methods=['POST'])
 def trade():
+    session = read_session()
     direction = request.json.get('direction')
     amount = float(request.json.get('amount', 1))
-    session_data['current_prediction'] = direction.upper()
-    # ws_worker will pick this up in background
-    return jsonify({"status": f"Trade request: {direction} {amount}"})
+    session['current_prediction'] = direction.upper()
+    session['trade_result'] = f"Trade request: {direction} {amount}"
+    write_session(session)
+    return jsonify({"status": session['trade_result']})
 
 @app.route('/auto-toggle', methods=['POST'])
 def auto_toggle():
-    session_data['auto_trade'] = request.json.get('state')
-    return jsonify({"status": f"Auto mode {'enabled' if session_data['auto_trade'] else 'disabled'}"})
+    session = read_session()
+    session['auto_trade'] = request.json.get('state')
+    write_session(session)
+    return jsonify({"status": f"Auto mode {'enabled' if session['auto_trade'] else 'disabled'}"})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
