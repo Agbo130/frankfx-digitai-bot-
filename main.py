@@ -1,5 +1,4 @@
 from flask import Flask, render_template, request, jsonify
-import threading
 import websocket
 import json
 
@@ -26,13 +25,11 @@ def start_ws():
     def on_message(ws, message):
         data = json.loads(message)
 
-        # Handle authorization
         if data.get('msg_type') == 'authorize':
             session_data['authorized'] = True
             ws.send(json.dumps({"balance": 1, "subscribe": 1}))
             ws.send(json.dumps({"ticks": "R_10", "subscribe": 1}))
 
-        # Handle account balance
         elif data.get('msg_type') == 'balance':
             session_data['account_info'] = {
                 'balance': data['balance']['balance'],
@@ -40,7 +37,6 @@ def start_ws():
                 'account_type': data['balance']['loginid']
             }
 
-        # Handle live ticks
         elif data.get('msg_type') == 'tick':
             digit = int(data['tick']['quote'][-1])
             session_data['latest_tick'] = digit
@@ -48,7 +44,6 @@ def start_ws():
             if len(session_data['digits']) > 20:
                 session_data['digits'].pop(0)
 
-            # Auto trade logic
             if session_data['auto_trade'] and session_data['current_prediction']:
                 if session_data['current_prediction'] == 'EVEN' and digit % 2 == 0:
                     session_data['win_count'] += 1
@@ -59,7 +54,6 @@ def start_ws():
 
                 session_data['current_prediction'] = None
 
-        # Trade confirmation
         elif data.get('msg_type') == 'buy':
             contract_id = data['buy']['contract_id']
             session_data['trade_result'] = f"Trade executed: Contract ID {contract_id}"
@@ -96,7 +90,10 @@ def set_token():
     session_data['digits'] = []
     session_data['win_count'] = 0
     session_data['loss_count'] = 0
-    threading.Thread(target=start_ws).start()
+
+    # ✅ FIX FOR RAILWAY (run directly, not in thread)
+    start_ws()
+
     return jsonify({"status": "WebSocket started"})
 
 @app.route('/latest')
