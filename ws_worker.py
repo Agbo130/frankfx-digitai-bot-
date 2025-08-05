@@ -44,29 +44,32 @@ def on_message(ws, message):
     elif data.get('msg_type') == 'balance':
         balance_info = data.get('balance', {})
         session['account_info'] = {
-            'balance': balance_info.get('balance', 0),
+            'balance': round(balance_info.get('balance', 0), 2),
             'currency': balance_info.get('currency', 'USD'),
             'account_type': balance_info.get('loginid', '')
         }
 
     elif data.get('msg_type') == 'tick':
-        digit = int(str(data['tick']['quote'])[-1])
-        session['latest_tick'] = digit
+        tick = data.get('tick', {})
+        if 'quote' in tick:
+            try:
+                digit = int(str(tick['quote'])[-1])
+                session['latest_tick'] = digit
+                session['digits'].append(digit)
+                if len(session['digits']) > 20:
+                    session['digits'].pop(0)
 
-        session['digits'].append(digit)
-        if len(session['digits']) > 20:
-            session['digits'].pop(0)
-
-        # ✅ Auto trade result check
-        prediction = session.get('current_prediction')
-        if session.get('auto_trade') and prediction:
-            if (prediction == 'EVEN' and digit % 2 == 0) or (prediction == 'ODD' and digit % 2 != 0):
-                session['win_count'] += 1
-                session['trade_result'] = "✅ WIN"
-            else:
-                session['loss_count'] += 1
-                session['trade_result'] = "❌ LOSS"
-            session['current_prediction'] = None
+                prediction = session.get('current_prediction')
+                if session.get('auto_trade') and prediction:
+                    if (prediction == 'EVEN' and digit % 2 == 0) or (prediction == 'ODD' and digit % 2 != 0):
+                        session['win_count'] += 1
+                        session['trade_result'] = "✅ WIN"
+                    else:
+                        session['loss_count'] += 1
+                        session['trade_result'] = "❌ LOSS"
+                    session['current_prediction'] = None
+            except:
+                pass
 
     write_session(session)
 
