@@ -1,16 +1,12 @@
 {
-  "token": null,
-  "authorized": false,
-  "latest_tick": null,
-  "digits": [],
-  "account_info": {
-    "balance": 0,
-    "currency": "USD",
-    "account_type": ""
-  },
-  "auto_trade": false,
-  "current_prediction": null,
-  "win_count": 0,
-  "loss_count": 0,
-  "trade_result": "-"
+  "latest_digit": "-",
+  "prediction": "-",
+  "confidence": "-",
+  "safe_entry": "-",
+  "account_id": "-",
+  "balance": "0",
+  "recent_digits": [],
+  "wins": 0,
+  "losses": 0
 }
+

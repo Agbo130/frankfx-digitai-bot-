@@ -1,51 +1,73 @@
-     <!DOCTYPE html><html lang="en">
+<!DOCTYPE html>
+<html>
 <head>
-  <meta charset="UTF-8">
   <title>FrankFx AI DigitBot</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #121212;
+      color: white;
+      padding: 2rem;
+      font-family: Arial, sans-serif;
+    }
+    .container {
+      max-width: 700px;
+      margin: auto;
+      background-color: #1e1e1e;
+      padding: 2rem;
+      border-radius: 10px;
+    }
+    .btn-success {
+      background-color: #00e676;
+      border: none;
+    }
+    .form-control, .form-select {
+      background-color: #2a2a2a;
+      color: white;
+      border: 1px solid #444;
+    }
+  </style>
 </head>
 <body>
   <div class="container">
-    <h1>📉 FrankFx AI DigitBot</h1><div class="token-box">
-  <input type="text" id="token" placeholder="Enter Deriv API token">
-  <button onclick="setToken()">Connect</button>
-</div>
+    <h2 class="text-center text-success">📊 FrankFx AI DigitBot</h2>
+    <div class="mb-3">
+      <input id="token" class="form-control" placeholder="Enter Deriv API token">
+      <button onclick="connect()" class="btn btn-success mt-2">Connect</button>
+    </div>
+    <div>
+      <strong>Account:</strong> <span id="account_id">-</span><br>
+      <strong>Balance:</strong> <span id="balance">0 USD</span>
+    </div>
+    <hr>
+    <div>
+      <p><strong>Latest Digit:</strong> <span id="latest_digit">-</span></p>
+      <p><strong>AI Prediction:</strong> <span id="prediction">-</span></p>
+      <p><strong>Confidence:</strong> <span id="confidence">-</span></p>
+      <p><strong>Safe Entry:</strong> <span id="safe_entry">-</span></p>
+    </div>
+    <hr>
+    <div class="input-group mb-3">
+      <select id="trade_type" class="form-select">
+        <option value="even">Digit EVEN</option>
+        <option value="odd">Digit ODD</option>
+      </select>
+      <input id="stake" class="form-control" value="1">
+      <button onclick="trade()" class="btn btn-success">Trade Now</button>
+    </div>
+    <div class="mb-3">
+      <input type="checkbox" id="auto_mode"> Enable Auto Mode
+    </div>
+    <div>
+      <h5>Recent Digits:</h5>
+      <p id="recent_digits">-</p>
+      <h5>Trade Result:</h5>
+      <p id="trade_result">-</p>
+      <h5>Win/Loss:</h5>
+      <p id="stats">Wins: 0 | Losses: 0</p>
+    </div>
+  </div>
 
-<div class="account-info">
-  <p><strong>Account:</strong> <span id="account-type">-</span></p>
-  <p><strong>Balance:</strong> <span id="account-balance">-</span></p>
-</div>
-
-<div class="info">
-  <p><strong>Latest Digit:</strong> <span id="latest-digit">-</span></p>
-  <p><strong>AI Prediction:</strong> <span id="prediction">-</span></p>
-  <p><strong>Confidence:</strong> <span id="confidence">-</span></p>
-  <p><strong>Safe Entry:</strong> <span id="safety">-</span></p>
-</div>
-
-<div class="trade-controls">
-  <select id="strategy">
-    <option value="even">Digit EVEN</option>
-    <option value="odd">Digit ODD</option>
-  </select>
-  <input type="number" id="stake" placeholder="Stake Amount" value="1">
-  <button onclick="tradeManual()">Trade Now</button>
-</div>
-
-<div class="auto-toggle">
-  <label><input type="checkbox" id="auto-mode" onchange="toggleAuto()"> Enable Auto Mode</label>
-</div>
-
-<div class="history">
-  <h3>Recent Digits:</h3>
-  <div id="digit-history">[waiting...]</div>
-
-  <h3>Trade Result:</h3>
-  <div id="trade-result">-</div>
-
-  <h3>Win/Loss:</h3>
-  <div id="win-loss">Wins: 0 | Losses: 0</div>
-</div>
-
-  </div>  <script src="/static/script.js"></script></body>
-</html>             
+  <script src="/static/app.js"></script>
+</body>
+</html>
