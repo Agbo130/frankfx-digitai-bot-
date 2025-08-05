@@ -1,9 +1,11 @@
+# ✅ ws_worker.py (Fully Updated)
+
 import websocket
 import json
 import time
 import os
 
-SESSION_FILE = 'session.json'
+SESSION_FILE = os.path.join(os.path.dirname(__file__), 'session.json')
 
 def read_session():
     if not os.path.exists(SESSION_FILE):
@@ -38,7 +40,7 @@ def on_message(ws, message):
 
     if data.get('msg_type') == 'authorize':
         print("✅ Authorized! Subscribing to balance and tick...")
-        # Subscribe to balance and ticks after successful auth
+        session['authorized'] = True
         ws.send(json.dumps({"balance": 1, "subscribe": 1}))
         ws.send(json.dumps({"ticks": "R_10", "subscribe": 1}))
 
@@ -61,7 +63,6 @@ def on_message(ws, message):
                 if len(session['digits']) > 20:
                     session['digits'].pop(0)
 
-                # Auto trade logic
                 prediction = session.get('current_prediction')
                 if session.get('auto_trade') and prediction:
                     if (prediction == 'EVEN' and digit % 2 == 0) or (prediction == 'ODD' and digit % 2 != 0):
@@ -75,6 +76,7 @@ def on_message(ws, message):
                 pass
 
     write_session(session)
+    print("✅ Session updated:", session)  # For debug
 
 def on_open(ws):
     session = read_session()
