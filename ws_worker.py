@@ -34,11 +34,12 @@ def on_message(ws, message):
     session = read_session()
     data = json.loads(message)
 
+    print("📨 Message Type:", data.get("msg_type"))  # For debugging
+
     if data.get('msg_type') == 'authorize':
-        session['authorized'] = True
-        # ✅ Request balance
+        print("✅ Authorized! Subscribing to balance and tick...")
+        # Subscribe to balance and ticks after successful auth
         ws.send(json.dumps({"balance": 1, "subscribe": 1}))
-        # ✅ Subscribe to ticks
         ws.send(json.dumps({"ticks": "R_10", "subscribe": 1}))
 
     elif data.get('msg_type') == 'balance':
@@ -48,6 +49,7 @@ def on_message(ws, message):
             'currency': balance_info.get('currency', 'USD'),
             'account_type': balance_info.get('loginid', '')
         }
+        print("💰 Balance updated:", session['account_info'])
 
     elif data.get('msg_type') == 'tick':
         tick = data.get('tick', {})
@@ -59,6 +61,7 @@ def on_message(ws, message):
                 if len(session['digits']) > 20:
                     session['digits'].pop(0)
 
+                # Auto trade logic
                 prediction = session.get('current_prediction')
                 if session.get('auto_trade') and prediction:
                     if (prediction == 'EVEN' and digit % 2 == 0) or (prediction == 'ODD' and digit % 2 != 0):
@@ -77,15 +80,16 @@ def on_open(ws):
     session = read_session()
     token = session.get('token')
     if token:
+        print("🔐 Sending authorize request...")
         ws.send(json.dumps({"authorize": token}))
     else:
-        print("❌ No token provided.")
+        print("❌ No token found in session.json")
 
 def on_error(ws, error):
     print("WebSocket error:", error)
 
 def on_close(ws, code, msg):
-    print("WebSocket closed. Code:", code, "| Msg:", msg)
+    print("WebSocket closed:", code, msg)
 
 def run_ws():
     while True:
@@ -99,7 +103,7 @@ def run_ws():
             )
             ws.run_forever()
         except Exception as e:
-            print("Error:", e)
+            print("❌ Error in WebSocket loop:", e)
         time.sleep(5)
 
 if __name__ == '__main__':
