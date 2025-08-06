@@ -1,15 +1,8 @@
 from flask import Flask, render_template, request, jsonify
-import subprocess
-import threading
-import os
 import json
+import os
 
 app = Flask(__name__)
-
-def start_ws_worker():
-    subprocess.Popen(["python", "ws_worker.py"])
-
-threading.Thread(target=start_ws_worker).start()
 
 @app.route('/')
 def index():
@@ -36,3 +29,7 @@ def signal_data():
             return jsonify(json.load(f))
     except:
         return jsonify({})
+
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 8000))
+    app.run(host="0.0.0.0", port=port)
