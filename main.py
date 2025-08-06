@@ -1,56 +1,36 @@
-# ✅ main.py (Final Fully Working Version)
-
 from flask import Flask, render_template, request, jsonify
-import json
+import subprocess
+import threading
 import os
+import json
 
 app = Flask(__name__)
 
-SESSION_FILE = os.path.join(os.path.dirname(__file__), 'session.json')
+# Launch ws_worker in background
+def start_ws_worker():
+    subprocess.Popen(["python", "ws_worker.py"])
 
-# Utility to read session.json
-def read_session():
-    if not os.path.exists(SESSION_FILE):
-        return {}
-    with open(SESSION_FILE, 'r') as f:
-        return json.load(f)
-
-# Utility to write session.json
-def write_session(data):
-    with open(SESSION_FILE, 'w') as f:
-        json.dump(data, f)
+threading.Thread(target=start_ws_worker).start()
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template("index.html")
 
-@app.route('/connect', methods=['POST'])
-def connect():
-    token = request.json.get('token')
-    session = read_session()
-    session['token'] = token
-    session['authorized'] = False
-    write_session(session)
-    return jsonify({"message": "Token saved. Waiting for authorization..."})
-
-@app.route('/session')
+@app.route('/session', methods=['GET'])
 def session_data():
-    session = read_session()
-    return jsonify(session)
+    try:
+        with open("session.json", "r") as f:
+            return jsonify(json.load(f))
+    except:
+        return jsonify({})
 
 @app.route('/trade', methods=['POST'])
 def trade():
     data = request.json
-    prediction = data.get('prediction')
-    amount = data.get('amount')
-
-    session = read_session()
-    session['current_prediction'] = prediction
-    session['auto_trade'] = True
-    session['trade_amount'] = amount
-    write_session(session)
-
-    return jsonify({"message": f"Trade request: {prediction.lower()} {amount}"})
+    with open("trade_request.json", "w") as f:
+        json.dump(data, f)
+    return jsonify({"status": "ok"})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8000)
+    port = int(os.environ.get("PORT", 8000))
+    app.run(host="0.0.0.0", port=port)
