@@ -1,11 +1,5 @@
 {
+  "token": "",
   "account_id": "-",
-  "balance": "0",
-  "latest_digit": "-",
-  "prediction": "-",
-  "confidence": "-",
-  "safe_entry": "-",
-  "recent_digits": [],
-  "wins": 0,
-  "losses": 0
+  "balance": "0"
 }

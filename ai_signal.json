@@ -1,5 +1,9 @@
 {
+  "latest_digit": "-",
   "prediction": "-",
-  "confidence": 0,
-  "safe_entry": "-"
+  "confidence": "-",
+  "safe_entry": "-",
+  "recent_digits": [],
+  "wins": 0,
+  "losses": 0
 }

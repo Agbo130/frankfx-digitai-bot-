@@ -2,27 +2,69 @@
 <html>
 <head>
   <title>FrankFx AI DigitBot</title>
+  <style>
+    body { background: #111; color: white; font-family: Arial; padding: 20px; }
+    input, select, button { padding: 10px; margin: 5px 0; }
+    .box { background: #222; padding: 20px; border-radius: 5px; width: 350px; }
+  </style>
 </head>
-<body style="font-family: Arial; padding: 20px; background: #111; color: white;">
-  <h2>FrankFx AI DigitBot</h2>
-  <p><strong>Account:</strong> <span id="account">-</span></p>
-  <p><strong>Balance:</strong> <span id="balance">0 USD</span></p>
-  <p><strong>Latest Digit:</strong> <span id="digit">-</span></p>
-  <p><strong>AI Prediction:</strong> <span id="prediction">-</span></p>
-  <p><strong>Confidence:</strong> <span id="confidence">-</span></p>
-  <p><strong>Safe Entry:</strong> <span id="safe">-</span></p>
+<body>
+  <div class="box">
+    <h2>FrankFx AI DigitBot</h2>
+    <input id="token" placeholder="Enter Deriv Token" />
+    <button onclick="connect()">Connect</button>
+    <p><b>Account:</b> <span id="acc">-</span></p>
+    <p><b>Balance:</b> <span id="bal">0 USD</span></p>
+    <hr>
+    <p><b>Latest Digit:</b> <span id="digit">-</span></p>
+    <p><b>AI Prediction:</b> <span id="pred">-</span></p>
+    <p><b>Confidence:</b> <span id="conf">-</span></p>
+    <p><b>Safe Entry:</b> <span id="safe">-</span></p>
+    <hr>
+    <select id="type">
+      <option value="even">Digit EVEN</option>
+      <option value="odd">Digit ODD</option>
+    </select>
+    <input id="amount" placeholder="Amount" value="1" />
+    <button onclick="trade()">Trade Now</button>
+    <p id="trade_result"></p>
+  </div>
+
   <script>
-    async function loadData() {
-      const session = await fetch('/session').then(r => r.json());
-      const signal = await fetch('/signal').then(r => r.json());
-      document.getElementById("account").innerText = session.account_id || "-";
-      document.getElementById("balance").innerText = session.balance + " USD";
-      document.getElementById("digit").innerText = signal.latest_digit || "-";
-      document.getElementById("prediction").innerText = signal.prediction || "-";
-      document.getElementById("confidence").innerText = signal.confidence || "-";
-      document.getElementById("safe").innerText = signal.safe_entry || "-";
+    async function connect() {
+      const token = document.getElementById("token").value;
+      await fetch('/session', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({token: token})
+      });
+      update();
     }
-    setInterval(loadData, 2000);
+
+    async function update() {
+      const s = await fetch('/session'); const d = await s.json();
+      document.getElementById("acc").innerText = d.account_id || "-";
+      document.getElementById("bal").innerText = d.balance + " USD";
+
+      const g = await fetch('/signal'); const a = await g.json();
+      document.getElementById("digit").innerText = a.latest_digit;
+      document.getElementById("pred").innerText = a.prediction;
+      document.getElementById("conf").innerText = a.confidence;
+      document.getElementById("safe").innerText = a.safe_entry;
+
+      setTimeout(update, 2000);
+    }
+
+    async function trade() {
+      const type = document.getElementById("type").value;
+      const amount = document.getElementById("amount").value;
+      await fetch("/trade", {
+        method: "POST",
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({type, amount})
+      });
+      document.getElementById("trade_result").innerText = "Trade request: " + type + " " + amount;
+    }
   </script>
 </body>
 </html>
