@@ -6,7 +6,6 @@ import json
 
 app = Flask(__name__)
 
-# Launch WebSocket worker
 def start_ws_worker():
     subprocess.Popen(["python", "ws_worker.py"])
 
@@ -16,13 +15,19 @@ threading.Thread(target=start_ws_worker).start()
 def index():
     return render_template("index.html")
 
-@app.route('/session', methods=['GET'])
+@app.route('/session', methods=['GET', 'POST'])
 def session_data():
-    try:
-        with open("session.json", "r") as f:
-            return jsonify(json.load(f))
-    except:
-        return jsonify({})
+    if request.method == 'POST':
+        data = request.get_json()
+        with open("session.json", "w") as f:
+            json.dump(data, f)
+        return jsonify({"status": "saved"})
+    else:
+        try:
+            with open("session.json", "r") as f:
+                return jsonify(json.load(f))
+        except:
+            return jsonify({})
 
 @app.route('/signal', methods=['GET'])
 def signal_data():
@@ -41,4 +46,4 @@ def trade():
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host="0.0.0.0", port=port)

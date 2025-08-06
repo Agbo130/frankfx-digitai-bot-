@@ -1,74 +1,76 @@
-import asyncio
-import websockets
+import websocket
 import json
-import random
+import time
 
-async def run():
-    with open("session.json", "r") as f:
-        session_data = json.load(f)
-    token = session_data.get("token")
+def get_token():
+    try:
+        with open("session.json", "r") as f:
+            return json.load(f).get("token")
+    except:
+        return None
 
+def update_session(account_id, balance):
+    try:
+        with open("session.json", "r") as f:
+            data = json.load(f)
+    except:
+        data = {}
+    data["account_id"] = account_id
+    data["balance"] = f"{balance:.2f}"
+    with open("session.json", "w") as f:
+        json.dump(data, f)
+
+def update_signal(digit, prediction, confidence, safe):
+    signal = {
+        "latest_digit": str(digit),
+        "prediction": prediction,
+        "confidence": f"{confidence}%",
+        "safe_entry": safe
+    }
+    with open("ai_signal.json", "w") as f:
+        json.dump(signal, f)
+
+def on_message(ws, message):
+    data = json.loads(message)
+
+    if "msg_type" in data:
+        if data["msg_type"] == "authorize":
+            loginid = data["authorize"]["loginid"]
+            balance = data["authorize"]["balance"]
+            update_session(loginid, balance)
+            ws.send(json.dumps({"ticks": "R_10", "subscribe": 1}))
+
+        elif data["msg_type"] == "tick":
+            digit = int(str(data["tick"]["quote"])[-1])
+            prediction = "EVEN" if digit % 2 == 0 else "ODD"
+            confidence = 85 if digit % 2 == 0 else 78
+            safe = "YES" if confidence >= 80 else "NO"
+            update_signal(digit, prediction, confidence, safe)
+
+def on_open(ws):
+    token = get_token()
     if not token:
-        print("No token found.")
+        print("❌ No token in session.json")
         return
+    ws.send(json.dumps({"authorize": token}))
 
-    uri = "wss://ws.binaryws.com/websockets/v3?app_id=90203"
-    async with websockets.connect(uri) as ws:
-        await ws.send(json.dumps({"authorize": token}))
+def on_error(ws, error):
+    print("WebSocket Error:", error)
 
-        # Balance stream
-        await ws.send(json.dumps({"balance": 1, "subscribe": 1}))
+def on_close(ws, *args):
+    print("WebSocket Closed. Reconnecting in 5s...")
+    time.sleep(5)
+    run_ws()
 
-        # Tick stream
-        await ws.send(json.dumps({"ticks": "R_10", "subscribe": 1}))
+def run_ws():
+    ws = websocket.WebSocketApp(
+        "wss://ws.binaryws.com/websockets/v3?app_id=90203",
+        on_open=on_open,
+        on_message=on_message,
+        on_error=on_error,
+        on_close=on_close
+    )
+    ws.run_forever()
 
-        latest_digit = "-"
-        recent_digits = []
-        wins = 0
-        losses = 0
-
-        while True:
-            msg = await ws.recv()
-            data = json.loads(msg)
-
-            if "authorize" in data:
-                account_id = data["authorize"]["loginid"]
-                with open("session.json", "r") as f:
-                    session = json.load(f)
-                session["account_id"] = account_id
-                with open("session.json", "w") as f:
-                    json.dump(session, f)
-
-            elif "balance" in data:
-                balance = data["balance"]["balance"]
-                with open("session.json", "r") as f:
-                    session = json.load(f)
-                session["balance"] = f"{balance:.2f}"
-                with open("session.json", "w") as f:
-                    json.dump(session, f)
-
-            elif "tick" in data:
-                digit = int(str(data["tick"]["quote"])[-1])
-                latest_digit = digit
-                recent_digits.append(digit)
-                if len(recent_digits) > 10:
-                    recent_digits.pop(0)
-
-                prediction = "EVEN" if random.random() > 0.5 else "ODD"
-                confidence = random.randint(75, 95)
-                safe = "YES" if confidence >= 85 else "NO"
-
-                ai_data = {
-                    "latest_digit": digit,
-                    "prediction": prediction,
-                    "confidence": f"{confidence}%",
-                    "safe_entry": safe,
-                    "recent_digits": recent_digits,
-                    "wins": wins,
-                    "losses": losses
-                }
-
-                with open("ai_signal.json", "w") as f:
-                    json.dump(ai_data, f)
-
-asyncio.run(run())
+if __name__ == "__main__":
+    run_ws()

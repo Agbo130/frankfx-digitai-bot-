@@ -4,8 +4,8 @@
   <title>FrankFx AI DigitBot</title>
   <style>
     body { background: #111; color: white; font-family: Arial; padding: 20px; }
-    input, select, button { padding: 10px; margin: 5px 0; }
     .box { background: #222; padding: 20px; border-radius: 5px; width: 350px; }
+    input, select, button { margin: 5px 0; padding: 10px; width: 100%; }
   </style>
 </head>
 <body>
@@ -25,34 +25,31 @@
       <option value="even">Digit EVEN</option>
       <option value="odd">Digit ODD</option>
     </select>
-    <input id="amount" placeholder="Amount" value="1" />
+    <input id="amount" type="number" value="1" />
     <button onclick="trade()">Trade Now</button>
-    <p id="trade_result"></p>
+    <p id="result"></p>
   </div>
 
   <script>
     async function connect() {
       const token = document.getElementById("token").value;
-      await fetch('/session', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({token: token})
+      await fetch("/session", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({token})
       });
-      update();
+      alert("Token saved! Prediction starting...");
     }
 
     async function update() {
-      const s = await fetch('/session'); const d = await s.json();
-      document.getElementById("acc").innerText = d.account_id || "-";
-      document.getElementById("bal").innerText = d.balance + " USD";
-
-      const g = await fetch('/signal'); const a = await g.json();
-      document.getElementById("digit").innerText = a.latest_digit;
-      document.getElementById("pred").innerText = a.prediction;
-      document.getElementById("conf").innerText = a.confidence;
-      document.getElementById("safe").innerText = a.safe_entry;
-
-      setTimeout(update, 2000);
+      const session = await fetch("/session").then(r => r.json());
+      const signal = await fetch("/signal").then(r => r.json());
+      document.getElementById("acc").innerText = session.account_id || "-";
+      document.getElementById("bal").innerText = session.balance + " USD";
+      document.getElementById("digit").innerText = signal.latest_digit;
+      document.getElementById("pred").innerText = signal.prediction;
+      document.getElementById("conf").innerText = signal.confidence;
+      document.getElementById("safe").innerText = signal.safe_entry;
     }
 
     async function trade() {
@@ -60,11 +57,13 @@
       const amount = document.getElementById("amount").value;
       await fetch("/trade", {
         method: "POST",
-        headers: {'Content-Type': 'application/json'},
+        headers: {"Content-Type": "application/json"},
         body: JSON.stringify({type, amount})
       });
-      document.getElementById("trade_result").innerText = "Trade request: " + type + " " + amount;
+      document.getElementById("result").innerText = "Trade Sent: " + type + " $" + amount;
     }
+
+    setInterval(update, 2000);
   </script>
 </body>
 </html>
