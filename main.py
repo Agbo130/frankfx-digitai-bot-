@@ -31,6 +31,14 @@ def trade():
         json.dump(data, f)
     return jsonify({"status": "ok"})
 
+@app.route('/signal', methods=['GET'])
+def signal_data():
+    try:
+        with open("ai_signal.json", "r") as f:
+            return jsonify(json.load(f))
+    except:
+        return jsonify({})
+        
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8000))
     app.run(host="0.0.0.0", port=port)

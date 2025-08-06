@@ -1,73 +1,100 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>FrankFx AI DigitBot</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <style>
-    body {
-      background-color: #121212;
-      color: white;
-      padding: 2rem;
-      font-family: Arial, sans-serif;
-    }
-    .container {
-      max-width: 700px;
-      margin: auto;
-      background-color: #1e1e1e;
-      padding: 2rem;
-      border-radius: 10px;
-    }
-    .btn-success {
-      background-color: #00e676;
-      border: none;
-    }
-    .form-control, .form-select {
-      background-color: #2a2a2a;
-      color: white;
-      border: 1px solid #444;
-    }
-  </style>
+    <title>FrankFx AI DigitBot</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>
+        body {
+            background-color: #111;
+            color: white;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+        }
+        .form-control, .btn {
+            margin-bottom: 10px;
+        }
+        .form-control {
+            background-color: #222;
+            color: white;
+            border: 1px solid #333;
+        }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <h2 class="text-center text-success">📊 FrankFx AI DigitBot</h2>
-    <div class="mb-3">
-      <input id="token" class="form-control" placeholder="Enter Deriv API token">
-      <button onclick="connect()" class="btn btn-success mt-2">Connect</button>
-    </div>
-    <div>
-      <strong>Account:</strong> <span id="account_id">-</span><br>
-      <strong>Balance:</strong> <span id="balance">0 USD</span>
-    </div>
-    <hr>
-    <div>
-      <p><strong>Latest Digit:</strong> <span id="latest_digit">-</span></p>
-      <p><strong>AI Prediction:</strong> <span id="prediction">-</span></p>
-      <p><strong>Confidence:</strong> <span id="confidence">-</span></p>
-      <p><strong>Safe Entry:</strong> <span id="safe_entry">-</span></p>
-    </div>
-    <hr>
-    <div class="input-group mb-3">
-      <select id="trade_type" class="form-select">
-        <option value="even">Digit EVEN</option>
-        <option value="odd">Digit ODD</option>
-      </select>
-      <input id="stake" class="form-control" value="1">
-      <button onclick="trade()" class="btn btn-success">Trade Now</button>
-    </div>
-    <div class="mb-3">
-      <input type="checkbox" id="auto_mode"> Enable Auto Mode
-    </div>
-    <div>
-      <h5>Recent Digits:</h5>
-      <p id="recent_digits">-</p>
-      <h5>Trade Result:</h5>
-      <p id="trade_result">-</p>
-      <h5>Win/Loss:</h5>
-      <p id="stats">Wins: 0 | Losses: 0</p>
-    </div>
-  </div>
+    <div class="container">
+        <h3 class="text-success">📊 FrankFx AI DigitBot</h3>
 
-  <script src="/static/app.js"></script>
+        <input type="text" id="token" class="form-control" placeholder="Enter Deriv API token">
+        <button class="btn btn-success" onclick="connect()">Connect</button>
+
+        <p><strong>Account:</strong> <span id="account">-</span></p>
+        <p><strong>Balance:</strong> <span id="balance">0 USD</span></p>
+
+        <div class="card text-dark">
+            <div class="card-body">
+                <p><strong>Latest Digit:</strong> <span id="digit">-</span></p>
+                <p><strong>AI Prediction:</strong> <span id="prediction">-</span></p>
+                <p><strong>Confidence:</strong> <span id="confidence">-</span></p>
+                <p><strong>Safe Entry:</strong> <span id="safe">-</span></p>
+            </div>
+        </div>
+
+        <div class="input-group">
+            <select id="contract" class="form-control">
+                <option value="even">Digit EVEN</option>
+                <option value="odd">Digit ODD</option>
+            </select>
+            <input id="stake" class="form-control" type="number" value="1" step="0.01">
+            <button class="btn btn-success" onclick="sendTrade()">Trade Now</button>
+        </div>
+
+        <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" id="autoMode">
+            <label class="form-check-label">Enable Auto Mode</label>
+        </div>
+
+        <div id="result" class="mt-3"></div>
+    </div>
+
+    <script>
+        function connect() {
+            const token = document.getElementById("token").value;
+            fetch("/session", {
+                method: "POST",
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({token: token})
+            }).then(() => {
+                alert("Connected. Refresh to see balance and prediction.");
+            });
+        }
+
+        async function loadData() {
+            const session = await fetch('/session').then(res => res.json());
+            const signal = await fetch('/signal').then(res => res.json());
+
+            if (session.account) document.getElementById("account").innerText = session.account;
+            if (session.balance) document.getElementById("balance").innerText = session.balance + " USD";
+            if (signal.latest_digit !== undefined) document.getElementById("digit").innerText = signal.latest_digit;
+            if (signal.prediction) document.getElementById("prediction").innerText = signal.prediction;
+            if (signal.confidence) document.getElementById("confidence").innerText = signal.confidence + "%";
+            if (signal.safe_entry) document.getElementById("safe").innerText = signal.safe_entry;
+        }
+
+        function sendTrade() {
+            const type = document.getElementById("contract").value;
+            const stake = parseFloat(document.getElementById("stake").value);
+            fetch("/trade", {
+                method: "POST",
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({type, stake})
+            }).then(() => {
+                document.getElementById("result").innerText = "Trade request: " + type + " " + stake;
+            });
+        }
+
+        setInterval(loadData, 2000);
+    </script>
 </body>
 </html>
