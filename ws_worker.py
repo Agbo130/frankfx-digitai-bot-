@@ -2,89 +2,92 @@ import websocket
 import json
 import time
 
-TOKEN = "BjAkf7K1UN88uaH"
-SIGNAL_FILE = "ai_signal.json"
-SESSION_FILE = "session.json"
+session_path = "session.json"
+signal_path = "ai_signal.json"
 
-recent_digits = []
+def write_session(data):
+    with open(session_path, "w") as f:
+        json.dump(data, f)
 
-def calculate_prediction():
-    odd = sum(1 for d in recent_digits if d % 2 != 0)
-    even = len(recent_digits) - odd
-    if even > odd:
-        prediction = "EVEN"
-        confidence = int((even / len(recent_digits)) * 100)
-    else:
-        prediction = "ODD"
-        confidence = int((odd / len(recent_digits)) * 100)
-    safe = "YES" if confidence >= 70 else "NO"
-    return prediction, confidence, safe
+def write_signal(data):
+    with open(signal_path, "w") as f:
+        json.dump(data, f)
 
-def save_signal(digit, prediction, confidence, safe):
-    signal = {
-        "latest_digit": digit,
-        "prediction": prediction,
-        "confidence": f"{confidence}%",
-        "safe_entry": safe
+def on_open(ws):
+    print("WebSocket opened")
+    token = open("token.txt").read().strip()
+    auth_req = {
+        "authorize": token
     }
-    with open(SIGNAL_FILE, "w") as f:
-        json.dump(signal, f)
-    print("✅ AI Prediction written:", signal)
-
-def save_balance(balance, loginid):
-    try:
-        with open(SESSION_FILE, "r") as f:
-            session = json.load(f)
-    except:
-        session = {}
-
-    session["balance"] = balance
-    session["account_id"] = loginid
-    with open(SESSION_FILE, "w") as f:
-        json.dump(session, f)
+    ws.send(json.dumps(auth_req))
 
 def on_message(ws, message):
     data = json.loads(message)
 
-    if data.get("msg_type") == "authorize":
-        print("✅ Authorized to Deriv.")
-        ws.send(json.dumps({"balance": 1, "subscribe": 1}))
-        ws.send(json.dumps({"ticks": "R_10", "subscribe": 1}))
+    # AUTH RESPONSE
+    if "authorize" in data:
+        acc_id = data["authorize"]["loginid"]
+        balance_req = {"balance": 1, "subscribe": 1}
+        tick_req = {"ticks_history": "R_10", "adjust_start_time": 1, "count": 20, "style": "ticks", "subscribe": 1}
+        ws.send(json.dumps(balance_req))
+        ws.send(json.dumps(tick_req))
+        write_session({"account_id": acc_id, "balance": "-", "latest_digit": "-", "prediction": "-", "confidence": "-", "safe_entry": "-", "recent_digits": [], "wins": 0, "losses": 0})
 
-    elif data.get("msg_type") == "balance":
-        bal = data["balance"]["balance"]
-        loginid = data["balance"]["loginid"]
-        save_balance(bal, loginid)
+    # BALANCE
+    elif "balance" in data:
+        with open(session_path, "r") as f:
+            sess = json.load(f)
+        sess["balance"] = str(data["balance"]["balance"])
+        write_session(sess)
 
-    elif data.get("msg_type") == "tick":
-        digit = int(str(data["tick"]["quote"])[-1])
-        recent_digits.append(digit)
-        if len(recent_digits) > 10:
-            recent_digits.pop(0)
-        prediction, confidence, safe = calculate_prediction()
-        save_signal(digit, prediction, confidence, safe)
+    # DIGITS
+    elif "history" in data or "tick" in data:
+        try:
+            digit = int(str(data.get("tick", {}).get("quote", ""))[-1]) if "tick" in data else int(str(data["history"]["prices"][-1])[-1])
+        except:
+            digit = "-"
+        digits = []
+        if "tick" in data:
+            digits.append(digit)
+        else:
+            digits = [int(str(p)[-1]) for p in data["history"]["prices"]]
 
-def on_open(ws):
-    print("🔐 Authorizing...")
-    ws.send(json.dumps({"authorize": TOKEN}))
+        odd_count = sum(1 for d in digits if d % 2 != 0)
+        even_count = len(digits) - odd_count
+
+        prediction = "EVEN" if even_count > odd_count else "ODD"
+        confidence = int((max(even_count, odd_count) / len(digits)) * 100)
+        safe_entry = "YES" if confidence >= 70 else "NO"
+
+        with open(session_path, "r") as f:
+            sess = json.load(f)
+        sess["latest_digit"] = digit
+        sess["recent_digits"] = digits[-10:]
+        write_session(sess)
+
+        write_signal({
+            "prediction": prediction,
+            "confidence": confidence,
+            "safe_entry": safe_entry
+        })
 
 def on_error(ws, error):
-    print("❌ Error:", error)
+    print("Error:", error)
 
-def on_close(ws, code, msg):
-    print("🔁 WebSocket closed. Reconnecting in 5s...")
-    time.sleep(5)
-    run_ws()
+def on_close(ws, close_status_code, close_msg):
+    print("WebSocket closed")
 
 def run_ws():
-    ws = websocket.WebSocketApp(
-        "wss://ws.deriv.com/websockets/v3",
-        on_open=on_open,
-        on_message=on_message,
-        on_error=on_error,
-        on_close=on_close
-    )
-    ws.run_forever()
+    while True:
+        try:
+            ws = websocket.WebSocketApp("wss://ws.binaryws.com/websockets/v3?app_id=90203",
+                                        on_open=on_open,
+                                        on_message=on_message,
+                                        on_error=on_error,
+                                        on_close=on_close)
+            ws.run_forever()
+        except:
+            time.sleep(5)
 
 if __name__ == "__main__":
     run_ws()
