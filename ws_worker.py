@@ -1,98 +1,73 @@
 import websocket
 import json
 import time
-import random
-import threading
 
 SESSION_FILE = "session.json"
-AI_SIGNAL_FILE = "ai_signal.json"
+SIGNAL_FILE = "ai_signal.json"
 
-def read_session_token():
+def read_token():
+    try:
+        with open(SESSION_FILE, "r") as f:
+            return json.load(f).get("token")
+    except:
+        return None
+
+def write_session(account_id, balance):
     try:
         with open(SESSION_FILE, "r") as f:
             data = json.load(f)
-            return data.get("token", "")
     except:
-        return ""
+        data = {}
+    data["account_id"] = account_id
+    data["balance"] = "{:.2f}".format(balance)
+    with open(SESSION_FILE, "w") as f:
+        json.dump(data, f)
 
-def update_session(data):
-    try:
-        with open(SESSION_FILE, "w") as f:
-            json.dump(data, f)
-    except:
-        pass
-
-def update_ai_signal(latest_digit, prediction, confidence, safe_entry):
-    try:
-        with open(AI_SIGNAL_FILE, "w") as f:
-            json.dump({
-                "latest_digit": str(latest_digit),
-                "prediction": prediction,
-                "confidence": f"{confidence}%",
-                "safe_entry": "YES" if safe_entry else "NO"
-            }, f)
-    except:
-        pass
-
-def generate_prediction(recent_digits):
-    if not recent_digits:
-        return "-", 0, False
-
-    odd_count = sum(1 for d in recent_digits if d % 2 == 1)
-    even_count = len(recent_digits) - odd_count
-
-    prediction = "ODD" if odd_count > even_count else "EVEN"
-    confidence = int((max(odd_count, even_count) / len(recent_digits)) * 100)
-    safe_entry = confidence >= 70
-
-    return prediction, confidence, safe_entry
+def write_signal(digit, prediction, confidence, safe):
+    signal = {
+        "latest_digit": str(digit),
+        "prediction": prediction,
+        "confidence": f"{confidence}%",
+        "safe_entry": safe
+    }
+    with open(SIGNAL_FILE, "w") as f:
+        json.dump(signal, f)
 
 def on_message(ws, message):
     data = json.loads(message)
 
-    if "msg_type" in data:
-        if data["msg_type"] == "authorize":
-            account_id = data["authorize"]["loginid"]
-            balance = data["authorize"]["balance"]
-            update_session({
-                "account_id": account_id,
-                "balance": f"{balance:.2f}"
-            })
+    if "authorize" in data:
+        acc = data["authorize"]["loginid"]
+        bal = data["authorize"]["balance"]
+        write_session(acc, bal)
+        ws.send(json.dumps({"ticks": "R_10", "subscribe": 1}))
 
-        elif data["msg_type"] == "tick":
-            digit = int(str(data["tick"]["quote"])[-1])
-            ws.recent_digits.append(digit)
-            if len(ws.recent_digits) > 20:
-                ws.recent_digits.pop(0)
-
-            prediction, confidence, safe_entry = generate_prediction(ws.recent_digits)
-            update_ai_signal(digit, prediction, confidence, safe_entry)
-
-def on_error(ws, error):
-    print("Error:", error)
-
-def on_close(ws):
-    print("WebSocket closed. Reconnecting...")
-    time.sleep(3)
-    start_websocket()  # Restart loop
+    elif "tick" in data:
+        digit = int(str(data["tick"]["quote"])[-1])
+        prediction = "EVEN" if digit % 2 == 0 else "ODD"
+        confidence = 85 if prediction == "EVEN" else 75
+        safe = "YES" if confidence >= 80 else "NO"
+        write_signal(digit, prediction, confidence, safe)
 
 def on_open(ws):
-    token = read_session_token()
+    token = read_token()
     if token:
         ws.send(json.dumps({"authorize": token}))
-        ws.send(json.dumps({"ticks": "R_10"}))
-        ws.recent_digits = []
     else:
-        print("Token missing.")
-        ws.close()
+        print("No token found.")
 
-def start_websocket():
-    ws = websocket.WebSocketApp("wss://ws.derivws.com/websockets/v3",
-                                on_message=on_message,
-                                on_error=on_error,
-                                on_close=on_close,
-                                on_open=on_open)
-    ws.run_forever()
+def run_ws():
+    while True:
+        try:
+            ws = websocket.WebSocketApp(
+                "wss://ws.derivws.com/websockets/v3",
+                on_open=on_open,
+                on_message=on_message
+            )
+            ws.run_forever()
+        except Exception as e:
+            print("WebSocket Error:", e)
+            time.sleep(3)
 
 if __name__ == "__main__":
-    start_websocket()
+    run_ws()

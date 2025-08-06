@@ -36,14 +36,3 @@ def signal_data():
             return jsonify(json.load(f))
     except:
         return jsonify({})
-
-@app.route('/trade', methods=['POST'])
-def trade():
-    data = request.json
-    with open("trade_request.json", "w") as f:
-        json.dump(data, f)
-    return jsonify({"status": "ok"})
-
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 8000))
-    app.run(host="0.0.0.0", port=port)
