@@ -1,113 +1,77 @@
-import asyncio
-import websockets
+import websocket
 import json
-from datetime import datetime
-import random
+import time
 
-session_file = "session.json"
-ai_signal_file = "ai_signal.json"
-trade_file = "trade_request.json"
+TOKEN = "PASTE_YOUR_DERIV_TOKEN_HERE"  # 🔁 Replace with your token
+SIGNAL_FILE = "ai_signal.json"
 
-# Initialize session file if not present
-def init_files():
-    for file, default in [
-        (session_file, {
-            "latest_digit": "-",
-            "account_id": "-",
-            "balance": "0",
-            "recent_digits": [],
-            "wins": 0,
-            "losses": 0
-        }),
-        (ai_signal_file, {
-            "prediction": "-",
-            "confidence": "-",
-            "safe_entry": "-"
-        })
-    ]:
-        try:
-            with open(file, "r") as f:
-                json.load(f)
-        except:
-            with open(file, "w") as f:
-                json.dump(default, f)
+recent_digits = []
 
-# Generate fake AI logic (replace this later with real AI model)
-def get_ai_prediction(recent_digits):
-    if not recent_digits:
-        return "-", "-", "-"
-    odds = [d for d in recent_digits if d % 2 == 1]
-    evens = [d for d in recent_digits if d % 2 == 0]
-    prediction = "ODD" if len(odds) > len(evens) else "EVEN"
-    confidence = f"{random.randint(75, 95)}%"
-    safe_entry = "YES" if len(recent_digits) > 5 else "NO"
-    return prediction, confidence, safe_entry
+def calculate_prediction():
+    odd = sum(1 for d in recent_digits if d % 2 != 0)
+    even = len(recent_digits) - odd
 
-async def run_ws():
-    init_files()
+    if even > odd:
+        prediction = "EVEN"
+        confidence = int((even / len(recent_digits)) * 100)
+    else:
+        prediction = "ODD"
+        confidence = int((odd / len(recent_digits)) * 100)
 
-    with open("token.txt", "r") as f:
-        token = f.read().strip()
+    safe = "YES" if confidence >= 70 else "NO"
+    return prediction, confidence, safe
 
-    uri = "wss://ws.deriv.com/websockets/v3"
+def save_signal(digit, prediction, confidence, safe):
+    data = {
+        "latest_digit": digit,
+        "prediction": prediction,
+        "confidence": f"{confidence}%",
+        "safe_entry": safe
+    }
+    with open(SIGNAL_FILE, "w") as f:
+        json.dump(data, f)
+    print("✅ Prediction written:", data)
 
-    async with websockets.connect(uri) as ws:
-        # Authorize
-        await ws.send(json.dumps({"authorize": token}))
-        auth_response = json.loads(await ws.recv())
-        print("Authorized:", auth_response)
+def on_message(ws, message):
+    data = json.loads(message)
 
-        if "error" in auth_response:
-            print("Authorization failed.")
-            return
-
-        account_id = auth_response["authorize"]["loginid"]
-
-        # Balance stream
-        await ws.send(json.dumps({"balance": 1, "subscribe": 1}))
-
-        # Digit stream
-        await ws.send(json.dumps({
-            "ticks": "R_10",  # or "1HZ10V" for volatility
+    if data.get("msg_type") == "authorize":
+        print("✅ Authorized")
+        ws.send(json.dumps({
+            "ticks": "R_10",
             "subscribe": 1
         }))
 
-        recent_digits = []
+    elif data.get("msg_type") == "tick":
+        digit = int(str(data["tick"]["quote"])[-1])
+        recent_digits.append(digit)
+        if len(recent_digits) > 10:
+            recent_digits.pop(0)
 
-        while True:
-            msg = json.loads(await ws.recv())
-            if "tick" in msg:
-                digit = int(str(msg["tick"]["quote"])[-1])
-                recent_digits.append(digit)
-                if len(recent_digits) > 10:
-                    recent_digits = recent_digits[-10:]
+        prediction, confidence, safe = calculate_prediction()
+        save_signal(digit, prediction, confidence, safe)
 
-                prediction, confidence, safe_entry = get_ai_prediction(recent_digits)
+def on_error(ws, error):
+    print("❌ Error:", error)
 
-                with open(session_file, "r") as f:
-                    session = json.load(f)
+def on_close(ws, code, msg):
+    print("🔁 Closed. Reconnecting in 3s...")
+    time.sleep(3)
+    run_ws()
 
-                session["latest_digit"] = str(digit)
-                session["recent_digits"] = recent_digits
+def on_open(ws):
+    print("🔐 Sending token...")
+    ws.send(json.dumps({"authorize": TOKEN}))
 
-                with open(session_file, "w") as f:
-                    json.dump(session, f)
-
-                with open(ai_signal_file, "w") as f:
-                    json.dump({
-                        "prediction": prediction,
-                        "confidence": confidence,
-                        "safe_entry": safe_entry
-                    }, f)
-
-            elif "balance" in msg:
-                balance = msg["balance"]["balance"]
-                with open(session_file, "r") as f:
-                    session = json.load(f)
-                session["balance"] = f"{balance / 100:.2f}"
-                session["account_id"] = account_id
-                with open(session_file, "w") as f:
-                    json.dump(session, f)
+def run_ws():
+    ws = websocket.WebSocketApp(
+        "wss://ws.deriv.com/websockets/v3",
+        on_open=on_open,
+        on_message=on_message,
+        on_error=on_error,
+        on_close=on_close
+    )
+    ws.run_forever()
 
 if __name__ == "__main__":
-    asyncio.run(run_ws())
+    run_ws()

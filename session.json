@@ -1,10 +1,8 @@
 {
-  "latest_digit": "-",
-  "prediction": "-",
-  "confidence": "-",
-  "safe_entry": "-",
+  "token": "PASTE_YOUR_DERIV_TOKEN_HERE",
   "account_id": "-",
   "balance": "0",
+  "latest_digit": "-",
   "recent_digits": [],
   "wins": 0,
   "losses": 0
