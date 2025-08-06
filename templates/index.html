@@ -45,7 +45,7 @@
       const session = await fetch("/session").then(r => r.json());
       const signal = await fetch("/signal").then(r => r.json());
       document.getElementById("acc").innerText = session.account_id || "-";
-      document.getElementById("bal").innerText = session.balance + " USD";
+      document.getElementById("bal").innerText = (session.balance || "0.00") + " USD";
       document.getElementById("digit").innerText = signal.latest_digit;
       document.getElementById("pred").innerText = signal.prediction;
       document.getElementById("conf").innerText = signal.confidence;
